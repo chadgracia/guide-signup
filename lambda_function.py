@@ -95,9 +95,10 @@ def lead_source_id_for(src):
 
 def last_name_from_email(email, first_name):
     """Derive a last name only when the email's local part is clearly
-    <first name or 3+ letter prefix of it><last name>, e.g. jennpearse@ +
-    Jennifer -> Pearse. Returns "" when unsure."""
-    local = (email.split("@")[0] or "").lower()
+    <first name or 3+ letter prefix of it><last name> (jennpearse@ +
+    Jennifer -> Pearse) or <first initial><last name of 4+ letters>
+    (ssilverstein@ + Sarah -> Silverstein). Returns "" when unsure."""
+    local = (email.split("@")[0] or "").lower().split("+")[0]
     first = "".join(c for c in (first_name or "").lower() if c.isalpha())
     if len(first) < 3:
         return ""
@@ -118,6 +119,9 @@ def last_name_from_email(email, first_name):
             if len(rest) >= 3 and rest.isalpha():
                 return rest.capitalize()
             return ""
+    # First initial + surname, e.g. ssilverstein@ + Sarah -> Silverstein
+    if local[0] == first[0] and len(local) >= 5:
+        return local[1:].capitalize()
     return ""
 
 
