@@ -10,10 +10,15 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Find which key sets Source on Sarah (person 1310443901) to Claude SEO
+      - name: Find which key (v2) sets Source on Sarah (person 1310443901) to Claude SEO
         shell: python
         run: |
-          import json, urllib.request
+          import json, urllib.request, urllib.error, traceback, builtins
+          _print = builtins.print
+          def print(*a):
+              _print("::notice::" + " ".join(str(x) for x in a).replace("\n", " "))
+          import sys
+          sys.excepthook = lambda t, v, tb: print("ERROR:", "".join(traceback.format_exception(t, v, tb))[-700:])
           AUTH = "api_key=ZRMHN4uJotjRDcZa8hKi&app_key=571978be28bd3b5b515a2cc5db96b674"
           PID, SRC = 1310443901, 3630329
           URL = f"https://api.pipelinecrm.com/api/v3/people/{PID}.json?{AUTH}"
