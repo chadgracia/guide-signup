@@ -10,39 +10,49 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Find which key (v2) sets Source on Sarah (person 1310443901) to Claude SEO
+      - name: Find which key sets a person's Source (v3, throwaway test person)
         shell: python
         run: |
-          import json, urllib.request, urllib.error, traceback, builtins
+          import json, urllib.request, urllib.error, traceback, builtins, sys
           _print = builtins.print
           def print(*a):
               _print("::notice::" + " ".join(str(x) for x in a).replace("\n", " "))
-          import sys
           sys.excepthook = lambda t, v, tb: print("ERROR:", "".join(traceback.format_exception(t, v, tb))[-700:])
           AUTH = "api_key=ZRMHN4uJotjRDcZa8hKi&app_key=571978be28bd3b5b515a2cc5db96b674"
-          PID, SRC = 1310443901, 3630329
-          URL = f"https://api.pipelinecrm.com/api/v3/people/{PID}.json?{AUTH}"
-          def call(method, body=None):
+          BASE = "https://api.pipelinecrm.com/api/v3"
+          SRC = 3630329
+          def call(method, path, body=None):
+              url = f"{BASE}{path}{'&' if '?' in path else '?'}{AUTH}"
               data = json.dumps(body).encode() if body else None
-              req = urllib.request.Request(URL, data=data, method=method,
+              req = urllib.request.Request(url, data=data, method=method,
                                            headers={"Content-Type": "application/json"})
               try:
                   with urllib.request.urlopen(req, timeout=20) as r:
-                      return r.status, json.loads(r.read())
+                      return r.status, json.loads(r.read() or b"{}")
               except urllib.error.HTTPError as e:
-                  return e.code, e.read().decode()[:300]
-          s, p = call("GET")
-          print("BEFORE:", s, p.get("lead_source") if isinstance(p, dict) else p, "| last_name:", p.get("last_name") if isinstance(p, dict) else "")
-          for body in ({"person": {"lead_source_id": SRC}},
-                       {"person": {"source_id": SRC}},
-                       {"person": {"lead_source": {"id": SRC}}}):
-              s, r = call("PUT", body)
-              s2, p = call("GET")
-              got = (p.get("lead_source") or {}).get("id") if isinstance(p, dict) else None
-              print("TRY", json.dumps(body), "-> PUT", s, "| lead_source now:", p.get("lead_source") if isinstance(p, dict) else p)
-              if got == SRC:
-                  print("WORKS WITH:", list(body["person"].keys())[0])
-                  break
-          s, r = call("PUT", {"person": {"last_name": "Silverstein"}})
-          s, p = call("GET")
-          print("AFTER: last_name:", p.get("last_name"), "| lead_source:", p.get("lead_source"))
+                  return e.code, {"error": e.read().decode()[:300]}
+          def src_of(pid):
+              s, p = call("GET", f"/people/{pid}.json")
+              return (p.get("lead_source") or {}).get("id"), p.get("lead_source")
+          results = {}
+          for key in ("lead_source_id", "source_id"):
+              s, p = call("POST", "/people.json", {"person": {
+                  "first_name": "ZZ Source", "last_name": f"Probe {key}",
+                  "email": f"chad.gracia+sourceprobe-{key}@gmail.com",
+                  "type": "Lead", key: SRC}})
+              pid = p.get("id")
+              got, raw = src_of(pid) if pid else (None, p)
+              results[f"POST {key}"] = got == SRC
+              print(f"POST with {key}: status {s}, person {pid}, lead_source after = {raw}")
+              if pid and got != SRC:
+                  for body in ({"lead_source_id": SRC}, {"source_id": SRC}, {"lead_source": {"id": SRC}}):
+                      s2, _ = call("PUT", f"/people/{pid}.json", {"person": body})
+                      got, raw = src_of(pid)
+                      results[f"PUT {list(body)[0]} (after POST {key})"] = got == SRC
+                      print(f"  PUT {json.dumps(body)}: status {s2}, lead_source after = {raw}")
+                      if got == SRC:
+                          break
+              if pid:
+                  s3, _ = call("DELETE", f"/people/{pid}.json")
+                  print(f"  deleted test person {pid}: status {s3}")
+          print("SUMMARY:", json.dumps(results))
