@@ -27,7 +27,7 @@ HMAC_SECRET         = os.environ.get("HMAC_SECRET", "")
 PIPELINE_JWT_BUCKET = "pipeline-token"
 PIPELINE_JWT_KEY    = "pipeline-jwt.json"
 
-# ── Lead source mapping (Pipeline person field "source_id") ──────────────────
+# ── Lead source mapping (Pipeline person field "lead_source_id") ─────────────
 # src tags containing "linkedin" → LinkedIn; everything else (hub/deal-page
 # tags, organic Google, direct, missing) → Claude SEO.
 SOURCE_LINKEDIN_ID = 3349364   # "LinkedIn"
@@ -145,7 +145,7 @@ def find_or_create_person(email, first_name, src, ts):
         "first_name": first_name or email.split("@")[0],
         "email": email,
         "type": "Lead",
-        "source_id": lead_source_id_for(src),
+        "lead_source_id": lead_source_id_for(src),
         "custom_fields": dict(NEW_LEAD_CUSTOM_FIELDS),
         "summary": (
             f"Guide signup via pre-ipo.graciagroup.com on {ts}. "
