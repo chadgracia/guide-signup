@@ -27,11 +27,18 @@ HMAC_SECRET         = os.environ.get("HMAC_SECRET", "")
 PIPELINE_JWT_BUCKET = "pipeline-token"
 PIPELINE_JWT_KEY    = "pipeline-jwt.json"
 
-# ── Lead source mapping (Pipeline lead_source_id) ────────────────────────────
-# src tags containing "linkedin" → LinkedIn; everything else (deal-page tags,
-# organic, direct, missing) → Newsletter/GG Web.
+# ── Lead source mapping (Pipeline person field "source_id") ──────────────────
+# src tags containing "linkedin" → LinkedIn; everything else (hub/deal-page
+# tags, organic Google, direct, missing) → Claude SEO.
 SOURCE_LINKEDIN_ID = 3349364   # "LinkedIn"
-SOURCE_DEFAULT_ID  = 3401177   # "Newsletter/GG Web"
+SOURCE_DEFAULT_ID  = 3630329   # "Claude SEO"
+
+# ── Fixed custom fields set on every NEW guide lead ──────────────────────────
+NEW_LEAD_CUSTOM_FIELDS = {
+    "custom_label_3775335": 6613673,   # Weekly Newsletter = Confirm
+    "custom_label_3075382": 6596061,   # Role = Investor
+    "custom_label_3923758": 7162165,   # Investor Level = Substantive
+}
 
 DISCLAIMER = """--
 DISCLOSURE: Rainmaker Securities, LLC ("RMS") is a FINRA registered broker-dealer and SIPC member. Find this broker-dealer and its agents on BrokerCheck. Our relationship summary can be found on the RMS website (https://www.rainmakersecurities.com/crs).
@@ -86,6 +93,34 @@ def lead_source_id_for(src):
     return SOURCE_DEFAULT_ID
 
 
+def last_name_from_email(email, first_name):
+    """Derive a last name only when the email's local part is clearly
+    <first name or 3+ letter prefix of it><last name>, e.g. jennpearse@ +
+    Jennifer -> Pearse. Returns "" when unsure."""
+    local = (email.split("@")[0] or "").lower()
+    first = "".join(c for c in (first_name or "").lower() if c.isalpha())
+    if len(first) < 3:
+        return ""
+    for sep in (".", "_", "-"):
+        if sep in local:
+            parts = [p for p in local.split(sep) if p]
+            if len(parts) == 2 and first.startswith(parts[0][:3]) \
+                    and parts[0] in first and parts[1].isalpha() \
+                    and len(parts[1]) >= 3:
+                return parts[1].capitalize()
+            return ""
+    if not local.isalpha():
+        return ""
+    for n in range(len(first), 2, -1):
+        prefix = first[:n]
+        if local.startswith(prefix):
+            rest = local[n:]
+            if len(rest) >= 3 and rest.isalpha():
+                return rest.capitalize()
+            return ""
+    return ""
+
+
 def find_or_create_person(email, first_name, src, ts):
     """Returns (person_id or None, existed: bool)."""
     jwt = get_jwt()
@@ -102,18 +137,21 @@ def find_or_create_person(email, first_name, src, ts):
                 if (p.get(k) or "").strip().lower() == target:
                     return p["id"], True
 
-    payload = {
-        "person": {
-            "first_name": first_name or email.split("@")[0],
-            "email": email,
-            "type": "Lead",
-            "lead_source_id": lead_source_id_for(src),
-            "summary": (
-                f"Guide signup via pre-ipo.graciagroup.com on {ts}. "
-                f"Source tag: {src or 'none'}."
-            ),
-        }
+    person = {
+        "first_name": first_name or email.split("@")[0],
+        "email": email,
+        "type": "Lead",
+        "source_id": lead_source_id_for(src),
+        "custom_fields": dict(NEW_LEAD_CUSTOM_FIELDS),
+        "summary": (
+            f"Guide signup via pre-ipo.graciagroup.com on {ts}. "
+            f"Source tag: {src or 'none'}."
+        ),
     }
+    last_name = last_name_from_email(email, first_name)
+    if last_name:
+        person["last_name"] = last_name
+    payload = {"person": person}
     resp = call_pipeline_api("POST", "/people.json", payload=payload, jwt=jwt)
     if resp["status"] == 200 and isinstance(resp["data"], dict) \
             and resp["data"].get("id"):
