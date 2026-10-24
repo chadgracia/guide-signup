@@ -17,4 +17,5 @@ jobs:
       - run: |
           python3 -m py_compile lambda_function.py
           zip -j function.zip lambda_function.py
-          aws lambda update-function-code --function-name guide-signup --zip-file fileb://function.zip
+          aws lambda update-function-code --function-name guide-signup --zip-file fileb://function.zip \
+            --query '{State:State,LastUpdateStatus:LastUpdateStatus,Runtime:Runtime,MemorySize:MemorySize,Timeout:Timeout}' --output json
