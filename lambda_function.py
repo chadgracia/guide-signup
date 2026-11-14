@@ -37,7 +37,7 @@ SOURCE_DEFAULT_ID  = 3630329   # "Claude SEO"
 NEW_LEAD_CUSTOM_FIELDS = {
     "custom_label_3775335": 6613673,   # Weekly Newsletter = Confirm
     "custom_label_3075382": 6596061,   # Role = Investor
-    "custom_label_3923758": 7162165,   # Investor Level = Substantive
+    "custom_label_3923758": 7161646,   # Investor Level = Hold: Screen for Substantive (no automatic deal access)
 }
 
 DISCLAIMER = """--
