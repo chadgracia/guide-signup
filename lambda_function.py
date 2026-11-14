@@ -63,6 +63,10 @@ def get_jwt():
 
 
 def make_token(id_value):
+    """Interest-form token (HMAC_SECRET). Empty key -> "" (never signs with an
+    empty key)."""
+    if not HMAC_SECRET:
+        return ""
     msg = str(id_value).encode()
     sig = hmac.new(HMAC_SECRET.encode(), msg, hashlib.sha256).digest()
     return base64.urlsafe_b64encode(sig).decode().rstrip("=")
@@ -175,8 +179,11 @@ def redirect():
 
 
 def guide_link(person_id):
-    if person_id:
-        return f"{GUIDE_URL}#p={person_id}&t={make_token(person_id)}"
+    token = make_token(person_id) if person_id else ""
+    if person_id and not token:
+        logger.error("guide-signup: HMAC_SECRET is not set; sending the plain guide link (no watchlist token)")
+    if token:
+        return f"{GUIDE_URL}#p={person_id}&t={token}"
     return GUIDE_URL
 
 
